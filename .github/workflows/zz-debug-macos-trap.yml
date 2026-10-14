@@ -1,0 +1,22 @@
+name: debug macos trap
+on:
+  push:
+    branches: [ci-debug/macos-trap]
+jobs:
+  trap:
+    runs-on: macos-latest
+    steps:
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.14"
+          activate-environment: true
+      - run: brew list python-tk &>/dev/null || brew install python-tk
+      - run: |
+          uv sync --no-install-project --extra dev --extra mac_dist
+          uv pip install --editable "." --no-deps
+      - name: full suite exactly like upstream CI
+        run: uv run pytest --cov=ardupilot_methodic_configurator --cov-report=xml:tests/coverage.xml --md=tests/results-3.14.md --junit-xml=tests/results-junit.xml -m "not sitl"
