@@ -12,6 +12,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 import argparse
 import importlib.util
+import os
+import subprocess
 import sys
 from pathlib import Path
 from queue import SimpleQueue
@@ -212,8 +214,36 @@ def test_screenshot_generator_registers_application_plugins_before_capture(tmp_p
     mock_register_plugins.assert_called_once_with()
 
 
+_RUNNING_ISOLATED = "AMC_SCREENSHOT_TEST_ISOLATED"
+
+
 def test_simple_parameter_editor_capture_suppresses_external_documentation(tmp_path) -> None:
     """Simple-mode capture does not launch a browser while settling the editor."""
+    if sys.platform == "darwin" and not os.environ.get(_RUNNING_ISOLATED):
+        # This test builds a second full Tk application on top of the shared session root.
+        # Late in the full suite on the macOS CI runners that kills the whole pytest process
+        # with SIGTRAP (exit code 133), so run it in a fresh interpreter instead.
+        result = subprocess.run(  # noqa: S603
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-p",
+                "no:cacheprovider",
+                "-o",
+                "addopts=",
+                "-q",
+                f"{__file__}::{test_simple_parameter_editor_capture_suppresses_external_documentation.__name__}",
+            ],
+            env={**os.environ, _RUNNING_ISOLATED: "1"},
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=25,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        return
+
     screenshot_generator.register_plugins()
 
     with (
